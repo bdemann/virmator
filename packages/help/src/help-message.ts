@@ -345,11 +345,28 @@ export function wrapLines(input: string, limit: number, format: Formatter): stri
 
             // didn't wrap on a space, we need to shift a word down
             if (!replacementLine.endsWith(' ') && !wrappedPart.startsWith(' ')) {
-                /** This is an edge case for type guarding. */
-                /* node:coverage ignore next */
-                const lastWord = safeMatch(replacementLine, /(\s\S+$)/)[0] || '';
-                lines[index] = replacementLine.slice(0, -1 * lastWord.length).trimEnd();
-                wrappedPart = `${lastWord}${wrappedPart.trim()}`;
+                const lastWordMatch = safeMatch(replacementLine, /(\s\S+$)/)[0];
+                const keptPortion = lastWordMatch
+                    ? replacementLine.slice(0, -1 * lastWordMatch.length).trimEnd()
+                    : '';
+
+                if (lastWordMatch && keptPortion) {
+                    lines[index] = keptPortion;
+                    wrappedPart = `${lastWordMatch}${wrappedPart.trim()}`;
+                } else {
+                    /**
+                     * Either `replacementLine` has no word boundary at all (one long unbroken
+                     * token, like a URL, fills the whole limit), or its only whitespace is leading
+                     * indent, so "the last word" is effectively the entire line. In both cases
+                     * there's no word boundary that actually shortens this line: shifting the
+                     * "word" down would just re-produce a same-length, over-`limit` line next
+                     * iteration (`currentIndent` below re-adds the same indent every time), looping
+                     * forever without ever consuming the token. Hard-wrap at the limit instead —
+                     * it's guaranteed to make progress, since `wrappedPart` (from
+                     * `line.slice(limit)`, untouched here) is strictly shorter than `line`.
+                     */
+                    lines[index] = replacementLine.trimEnd();
+                }
             }
 
             const currentIndent = getIndent(line, format);

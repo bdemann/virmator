@@ -374,4 +374,25 @@ describe(wrapLines.name, () => {
             '    hello\n    there',
         );
     });
+    it('hard-wraps a single token with no whitespace instead of looping forever', () => {
+        const unbrokenToken = 'a'.repeat(50);
+        assert.strictEquals(
+            wrapLines(unbrokenToken, 10, createFormatter(HelpMessageSyntax.Cli)),
+            'aaaaaaaaaa\naaaaaaaaaa\naaaaaaaaaa\naaaaaaaaaa\naaaaaaaaaa',
+        );
+    });
+    it('hard-wraps an indented unbroken token (like a markdown link) instead of looping forever', () => {
+        /**
+         * This reproduces a real hang: a line whose only whitespace is its leading indent, followed
+         * by one long unbroken token (e.g. a Markdown-style `[name](url)` dep link). `/(\s\S+$)/`
+         * matches from that leading indent all the way to the end of the line, so "the last word"
+         * is effectively the whole line; shifting it down verbatim (with the same indent re-added
+         * by `getIndent` every pass) reproduced an identical over-`limit` line forever and never
+         * terminated.
+         */
+        const indentedUnbrokenToken = `    ${'a'.repeat(50)}`;
+        const result = wrapLines(indentedUnbrokenToken, 10, createFormatter(HelpMessageSyntax.Cli));
+        assert.isTrue(result.length > 0);
+        assert.strictEquals(result.replaceAll(/\s/g, ''), 'a'.repeat(50));
+    });
 });
